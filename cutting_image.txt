@@ -1,0 +1,46 @@
+final text_encoder_type: bert-base-uncased
+_IncompatibleKeys(missing_keys=[], unexpected_keys=['label_enc.weight', 'bert.embeddings.position_ids'])
+fake/masactrl/139.png
+fake/masactrl/213.png
+fake/masactrl/311.png
+fake/masactrl/342.png
+fake/masactrl/378.png
+fake/masactrl/563.png
+fake/masactrl/632.png
+fake/masactrl/633.png
+fake/masactrl/741.png
+fake/masactrl/803.png
+fake/masactrl/864.png
+fake/masactrl/924.png
+fake/masactrl/1304.png
+fake/masactrl/1413.png
+fake/masactrl/1510.png
+fake/masactrl/1582.png
+fake/masactrl/1635.png
+fake/masactrl/1767.png
+fake/masactrl/1910.png
+fake/masactrl/2047.png
+error: fake/masactrl/2561.png
+error: tile cannot extend outside image
+fake/masactrl/2614.png
+fake/masactrl/2866.png
+fake/masactrl/2951.png
+fake/masactrl/2993.png
+fake/masactrl/3062.png
+fake/masactrl/3213.png
+fake/masactrl/3683.png
+fake/masactrl/3688.png
+fake/masactrl/3750.png
+fake/masactrl/3801.png
+fake/masactrl/3980.png
+fake/masactrl/4050.png
+fake/masactrl/4119.png
+fake/masactrl/4138.png
+fake/masactrl/4150.png
+fake/masactrl/4670.png
+fake/masactrl/4819.png
+fake/masactrl/4827.png
+fake/masactrl/4908.png
+fake/masactrl/4967.png
+zero or many bbox: 40
+process_cnt: 1874
