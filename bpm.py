@@ -31,8 +31,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # BPM
-from region_aware_judge import determine_size, determine_position_multi_bbox
-from semantic_aware_judge import clip_text_score, clip_score, expand_box, crop_box, calculate_l2_distance
+from bpm_utils.region_aware_judge import determine_size, determine_position_multi_bbox
+from bpm_utils.semantic_aware_judge import clip_text_score, clip_score, expand_box, crop_box, calculate_l2_distance
 
 
 def load_image(image_path):

@@ -2,7 +2,7 @@ import torch
 from transformers import pipeline
 import json
 from tqdm import tqdm
-from prompt import (
+from bpm_utils.prompt import (
     PARSE_INSTRUCTION_PROMPT,
     EDIT_TYPE_PROMPT,
     BEING_ADDED_TO_OBJECT_PROMPT,
