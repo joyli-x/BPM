@@ -30,6 +30,10 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+# BPM
+from region_aware_judge import determine_size, determine_position_multi_bbox
+from semantic_aware_judge import clip_text_score, clip_score, expand_box, crop_box, calculate_l2_distance
+
 
 def load_image(image_path):
     # load image
@@ -138,140 +142,6 @@ def save_mask_data(output_dir, mask_list, box_list, label_list):
     with open(os.path.join(output_dir, 'mask.json'), 'w') as f:
         json.dump(json_data, f)
 
-def clip_text_score(image_path, text):
-    # 预处理图像
-    if isinstance(image_path, str):
-        image = Image.open(image_path)
-    else:
-        image = image_path
-        
-    # 处理输入
-    inputs = clip_processor(
-        images=image,
-        text=[text],
-        return_tensors="pt",
-        padding=True
-    ).to(device)
-    
-    # 获取图像和文本特征
-    with torch.no_grad():
-        outputs = clip_model(**inputs)
-        image_features = outputs.image_embeds
-        text_features = outputs.text_embeds
-        
-    # 归一化特征向量
-    image_features = F.normalize(image_features, dim=-1)
-    text_features = F.normalize(text_features, dim=-1)
-    
-    # 计算余弦相似度
-    similarity = torch.cosine_similarity(image_features, text_features)
-    
-    return similarity.item()
-
-# clip_score 函数
-def clip_score(src_image, tar_image, src_txt, trg_txt):
-    
-    # 处理图像和文本
-    inputs_src = clip_processor(text=[src_txt], images=src_image, return_tensors="pt", padding=True).to(device)
-    # print(inputs_src.keys())
-    inputs_tar = clip_processor(text=[trg_txt], images=tar_image, return_tensors="pt", padding=True).to(device)
-    
-    # 编码图像和文本特征
-    with torch.no_grad():
-        src_img_features = clip_model.get_image_features(inputs_src['pixel_values'])
-        tar_img_features = clip_model.get_image_features(inputs_tar['pixel_values'])
-        src_txt_features = clip_model.get_text_features(inputs_src['input_ids'], inputs_src['attention_mask'])
-        trg_txt_features = clip_model.get_text_features(inputs_tar['input_ids'], inputs_tar['attention_mask'])
-    
-    # 计算图像和文本特征的差值
-    if "None" in src_txt:
-        delta_text = trg_txt_features
-    elif "None" in trg_txt:
-        delta_text = -src_txt_features
-    else:
-        delta_text = trg_txt_features - src_txt_features
-    delta_img = tar_img_features - src_img_features
-    
-    # 计算余弦相似度 (即CLIPScore)
-    score = torch.cosine_similarity(delta_img, delta_text)
-    
-    return score.item()
-
-def expand_box(boxes, scale=1.2, image_shape=None):
-    # 如果只有一个box，直接使用它
-    if len(boxes) == 1:
-        box = boxes[0]
-    else:
-        # 计算能装得下所有box的最小包围框
-        x0 = min(box[0] for box in boxes)
-        y0 = min(box[1] for box in boxes)
-        x1 = max(box[2] for box in boxes)
-        y1 = max(box[3] for box in boxes)
-        box = [x0, y0, x1, y1]
-
-    # 计算原框的中心
-    center_x = (box[0] + box[2]) / 2
-    center_y = (box[1] + box[3]) / 2
-    
-    # 计算新框的尺寸
-    width = box[2] - box[0]
-    height = box[3] - box[1]
-    
-    new_width = width * scale
-    new_height = height * scale
-    
-    # 计算新的框的左上角和右下角
-    new_x0 = center_x - new_width / 2
-    new_y0 = center_y - new_height / 2
-    new_x1 = center_x + new_width / 2
-    new_y1 = center_y + new_height / 2
-    
-    # 确保新框不会超出图片边界
-    if image_shape is not None:
-        height, width, _ = image_shape
-        new_x0 = max(0, new_x0)
-        new_y0 = max(0, new_y0)
-        new_x1 = min(width, new_x1)
-        new_y1 = min(height, new_y1)
-        
-    return np.array([new_x0, new_y0, new_x1, new_y1])
-
-def crop_box(image, box):
-    # 将box用作裁剪框，确保box的值是整数
-    x0 = int(box[0])
-    y0 = int(box[1])
-    x1 = int(box[2])
-    y1 = int(box[3])
-    
-    # 裁剪并返回新图像
-    return image[y0:y1, x0:x1]
-
-def calculate_l2_distance(image_path1, image_path2, mask, shape_const=500):
-    # 读取图像
-    img1 = cv2.imread(image_path1)
-    img2 = cv2.imread(image_path2)
-
-    # 确保两张图像的大小相同
-    img1 = cv2.resize(img1, (shape_const, shape_const))
-    img2 = cv2.resize(img2, (shape_const, shape_const))
-
-    # 计算l2距离
-    # 转换为float32
-    # img1 = img1.astype(np.float32)
-    # img2 = img2.astype(np.float32)
-    diff = img1 - img2
-    l2_distance = np.sqrt(np.mean(diff ** 2, axis=2))
-
-    # 应用掩码
-    masked_distances = l2_distance[mask == 0]
-
-    # 计算平均值
-    if len(masked_distances) > 0:
-        average_l2_distance = np.mean(masked_distances)
-    else:
-        average_l2_distance = 0.0  # 如果没有掩码区域，返回0
-
-    return float(average_l2_distance / 255) # 返回归一化的值
 
 
 
@@ -296,8 +166,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--use_sam_hq", action="store_true", help="using sam-hq for prediction"
     )
-    parser.add_argument("--input_image", type=str, required=True, help="path to image file")
-    parser.add_argument("--text_prompt", type=str, required=True, help="text prompt")
     parser.add_argument(
         "--output_dir", "-o", type=str, default="outputs", required=True, help="output directory"
     )
@@ -337,206 +205,234 @@ if __name__ == "__main__":
         predictor = SamPredictor(sam_model_registry[sam_version](checkpoint=sam_checkpoint).to(device))
 
     # load clip model
-    clip_model = CLIPModel.from_pretrained("/network_space/server128/shared/zhuoying/models/clip-vit-large-patch14").to(device)
-    clip_processor = CLIPProcessor.from_pretrained("/network_space/server128/shared/zhuoying/models/clip-vit-large-patch14")
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
     print('CLIP model loaded')
-
-    # load json
-    # json_file = '/network_space/server128/shared/zhuoying/data/MyData/metadata/dalle2_metadata.json'
-    # with open(json_file, 'r') as f:
-    #     metadata = json.load(f)
     
     # load idx
-    idx_file = '/network_space/server128/shared/zhuoying/data/MyData/user_study/sample_test/metadata.json'
-    # idx_list = []
+    idx_file = './data/sample_test/metadata.json'
     with open(idx_file, 'r') as f:
         user_data = json.load(f)
-    # for entry in user_data:
-    #     idx_list.append(entry['idx'])
     
-    image_dir = '/network_space/server128/shared/zhuoying/data/MyData/user_study/'
+    image_dir = './data/'
     
     image_resize_const = 500
     process_cnt = 0
     cnt = 0
 
-    # idx2model = {'1': 'mgie', '2': 'ft_ip2p', '3': 'ip2p', '4': 'dalle2', '5': 'genartist', '6': 'ace'}
     idx2model = {'1': 'pie', '2': 'hq_edit', '3': 'ft_ip2p', '4': 'ip2p'}
     LLM_model = 'gemma'
 
     for item in tqdm(user_data):
         for image_idx in idx2model:
             entry = item[f'edited_image{image_idx}']
-            # entry['source_image_path'] = os.path.join('sample_test/real/ms_coco/', os.path.basename(entry['image_path']))
             entry['source_image_path'] = os.path.join(image_dir, item['source_image_path'])
-            entry['original_image_edited_area'] = item['LLM'][f'{LLM_model}_origin']
-            entry['edited_image_edited_area'] = item['LLM'][f'{LLM_model}_edited']
-            if "added_object" in entry:
-                entry['edited_image_edited_area'] = item[f'added_object']
+
+            entry['original_image_edited_area'] = item['original_part']
+            entry['edited_image_edited_area'] = item['edited_part']
+            if 'none' in entry['original_image_edited_area'] and item['added_object']:
+                entry['edited_image_edited_area'] = item['added_object']
             
+            # global edit
             if "all" in entry['original_image_edited_area']:
-                item[f'edited_image{image_idx}'][f'my_edit_quality_{LLM_model}'] = clip_text_score(os.path.join(image_dir, entry['image_path']), item['instruction'])
-                item[f'edited_image{image_idx}'][f'my_preservation_{LLM_model}'] = 0
+                item[f'edited_image{image_idx}'][f'edit_quality'] = clip_text_score(
+                                                                    os.path.join(image_dir, entry['image_path']), 
+                                                                    item['instruction'], 
+                                                                    clip_processor=clip_processor, 
+                                                                    clip_model=clip_model, 
+                                                                    device=device
+                                                                    )
+                item[f'edited_image{image_idx}'][f'preservation'] = 0
+                item[f'edited_image{image_idx}'][f'size'] = 1
+                item[f'edited_image{image_idx}'][f'position'] = 1
                 continue
 
+            # local edit
             modification_score = 0
             consistency_score = 0
             masks_list = []
 
-            # try:
-            # get bbox
-            if "None" in entry['original_image_edited_area']:
-                image_path = os.path.join(image_dir, entry['image_path'])
-                text_prompt = entry['edited_image_edited_area'] # added_object??
-
+            # detect bboxes in original image and edited image
+            # source image
+            source_boxes_filt = []
+            if "none" not in entry['original_image_edited_area'] or item['being_added']:
+                # load source image
+                source_image_path = os.path.join(image_dir, entry['source_image_path'])
+                if "none" in entry['original_image_edited_area']:
+                    source_text_prompt = item['being_added']
+                else:
+                    source_text_prompt = entry['original_image_edited_area']
                 # load image
-                image_pil, image = load_image(image_path)
+                source_image_pil, source_image = load_image(source_image_path)
 
                 # run grounding dino model
-                boxes_filt, pred_phrases = get_grounding_output(
-                    model, image, text_prompt, box_threshold, text_threshold, device=device
+                source_boxes_filt, source_pred_phrases = get_grounding_output(
+                    model, source_image, source_text_prompt, box_threshold, text_threshold, device=device
                 )
 
-                # 没有检测到bbox
-                if len(pred_phrases) == 0:
-                    modification_score = 0
+                # resize bbox
+                size = (image_resize_const, image_resize_const)
+                H, W = size[1], size[0]
+                for i in range(source_boxes_filt.size(0)):
+                    source_boxes_filt[i] = source_boxes_filt[i] * torch.Tensor([W, H, W, H])
+                    source_boxes_filt[i][:2] -= source_boxes_filt[i][2:] / 2
+                    source_boxes_filt[i][2:] += source_boxes_filt[i][:2]
+                source_boxes_filt = source_boxes_filt.cpu()
 
-            else:
-                image_path = os.path.join(image_dir, entry['source_image_path'])
-                text_prompt = entry['original_image_edited_area']
+            # edited image
+            edited_boxes_filt = []
+            if "none" not in entry['edited_image_edited_area']:
+                # load edited image
+                edited_image_path = os.path.join(image_dir, entry['image_path'])
+                edited_text_prompt = entry['edited_image_edited_area']
+                # load image
+                edited_image_pil, edited_image = load_image(edited_image_path)
+
+                # run grounding dino model
+                edited_boxes_filt, edited_pred_phrases = get_grounding_output(
+                    model, edited_image, edited_text_prompt, box_threshold, text_threshold, device=device
+                )
+
+                # resize bbox
+                size = (image_resize_const, image_resize_const)
+                H, W = size[1], size[0]
+                for i in range(edited_boxes_filt.size(0)):
+                    edited_boxes_filt[i] = edited_boxes_filt[i] * torch.Tensor([W, H, W, H])
+                    edited_boxes_filt[i][:2] -= edited_boxes_filt[i][2:] / 2
+                    edited_boxes_filt[i][2:] += edited_boxes_filt[i][:2]
+                edited_boxes_filt = edited_boxes_filt.cpu()
             
-                # load image
-                image_pil, image = load_image(image_path)
+            # Region-Aware Judge
+            item[f'edited_image{image_idx}'][f'size'] = float(determine_size(edited_boxes_filt, 
+                                                                      source_boxes_filt,
+                                                                      item))
+            item[f'edited_image{image_idx}'][f'position'] = float(determine_position_multi_bbox(edited_boxes_filt, 
+                                                                                         source_boxes_filt, 
+                                                                                         item))
 
-                # run grounding dino model
-                boxes_filt, pred_phrases = get_grounding_output(
-                    model, image, text_prompt, box_threshold, text_threshold, device=device
-                )
+            # Semantic-Aware Judge
+            # special case: no bbox detected in original image and it's not 'adding' (detection failed)
+            if "none" not in entry['original_image_edited_area']:
+                if len(source_pred_phrases) == 0:
+                    modification_score = clip_text_score(
+                        os.path.join(image_dir, entry['image_path']), 
+                        entry['edited_image_edited_area'], 
+                        clip_processor=clip_processor, 
+                        clip_model=clip_model, 
+                        device=device)
+                    item[f'edited_image{image_idx}'][f'edit_quality'] = modification_score
 
-                # 没有检测到bbox
-                if len(pred_phrases) == 0:
-                    item[f'edited_image{image_idx}'][f'my_edit_quality_{LLM_model}'] = clip_text_score(os.path.join(image_dir, entry['image_path']), entry['edited_image_edited_area'])
-                    item[f'edited_image{image_idx}'][f'my_preservation_{LLM_model}'] = 0
-                    # print("error: no bbox in original image")
-                    # print(f"{entry['image_path']}")
+                    consistency_score = calculate_l2_distance(os.path.join(image_dir, entry['source_image_path']), 
+                                                          os.path.join(image_dir, entry['image_path']), 
+                                                          torch.zeros((image_resize_const, image_resize_const)))
+                    item[f'edited_image{image_idx}'][f'preservation'] = -consistency_score
+
+                    print("error: no bbox detected in original image")
+                    print(f"{entry['image_path']}")
                     cnt += 1
                     continue
 
-            if len(pred_phrases) != 0:
-                # 加载修改后的图
-                image_path = os.path.join(image_dir, entry['image_path'])
-                image = cv2.imread(image_path)
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                image = cv2.resize(image, (image_resize_const, image_resize_const))
-                # predictor.set_image(image)
+            # special case: no bbox detected in edited image and it's not 'removing' (edit failed)
+            if "none" not in entry['edited_image_edited_area']:
+                if len(edited_pred_phrases) == 0:
+                    modification_score = 0
+                    item[f'edited_image{image_idx}'][f'edit_quality'] = modification_score
 
-                # 加载原图
-                source_image_path = os.path.join(image_dir, entry['source_image_path'])
-                source_image = cv2.imread(source_image_path)
-                source_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2RGB)
-                source_image = cv2.resize(source_image, (image_resize_const, image_resize_const))
+                    consistency_score = calculate_l2_distance(os.path.join(image_dir, entry['source_image_path']), 
+                                                          os.path.join(image_dir, entry['image_path']), 
+                                                          torch.zeros((image_resize_const, image_resize_const)))
+                    item[f'edited_image{image_idx}'][f'preservation'] = -consistency_score
+                    continue
 
-                size = (image_resize_const, image_resize_const)
-                H, W = size[1], size[0]
-                for i in range(boxes_filt.size(0)):
-                    boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
-                    boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
-                    boxes_filt[i][2:] += boxes_filt[i][:2]
+            # normal case
+            # load edited image
+            image_path = os.path.join(image_dir, entry['image_path'])
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, (image_resize_const, image_resize_const))
 
-                boxes_filt = boxes_filt.cpu()
+            # load original image
+            source_image_path = os.path.join(image_dir, entry['source_image_path'])
+            source_image = cv2.imread(source_image_path)
+            source_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2RGB)
+            source_image = cv2.resize(source_image, (image_resize_const, image_resize_const))
 
-                # 扩大box并裁剪图像
-                expanded_box = expand_box(boxes_filt.numpy(), scale=1.5, image_shape=image.shape)
-                cropped_image = crop_box(image, expanded_box)
-                cropped_source_image = crop_box(source_image, expanded_box)
-
-                # # 保存裁剪后的图像
-                # cropped_image_pil = Image.fromarray(cropped_image)
-                # save_path = os.path.join(output_dir, 'cropped_image', entry['image_path'])
-                # os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                # cropped_image_pil.save(save_path)
-
-                # modification score: clip text
-                modification_score = clip_score(cropped_source_image, cropped_image, entry['original_image_edited_area'], entry['edited_image_edited_area']) # added_object??
-                # modification_score = clip_text_score(cropped_image,entry['edited_image_edited_area'])
-
-                # consistency score: l2
-                for j in range(2):
-                    if j % 2 == 0:
-                        # original image
-                        if "None" in entry['original_image_edited_area']:
-                            continue
-                        image_path = os.path.join(image_dir, entry['source_image_path'])
-                    else:
-                        # edited image
-                        if "None" in entry['edited_image_edited_area']:
-                            continue
-                        image_path = os.path.join(image_dir, entry['image_path'])
-                    image = cv2.imread(image_path)
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    image = cv2.resize(image, (image_resize_const, image_resize_const))
-
-                    predictor.set_image(image)
-                    transformed_boxes = predictor.transform.apply_boxes_torch(boxes_filt, image.shape[:2]).to(device)
-
-                    masks, _, _ = predictor.predict_torch(
-                        point_coords = None,
-                        point_labels = None,
-                        boxes = transformed_boxes.to(device),
-                        multimask_output = False,
-                    )
-                    masks_list.extend(masks)
-
-                # merge masks
-                if len(masks_list) == 0:
-                    mask_img = torch.zeros((image_resize_const, image_resize_const))
-                else:
-                    mask_img = torch.zeros(masks_list[0].shape[-2:])
-                    for mask in masks_list:
-                        mask_img[mask.cpu().numpy()[0] == True] = 1
-
-                # save mask
-                save_path = os.path.join(output_dir, 'mask', entry['image_path'])
-                # print(save_path)
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                cv2.imwrite(save_path, mask_img.numpy()*255)
-
-                consistency_score = calculate_l2_distance(os.path.join(image_dir, entry['source_image_path']), os.path.join(image_dir, entry['image_path']), mask_img)
-            
+            # expand bbox and crop image
+            if 'none' in entry['original_image_edited_area']: # add
+                expanded_box = expand_box(edited_boxes_filt.numpy(), scale=1.5, image_shape=image.shape)
             else:
-                consistency_score = calculate_l2_distance(os.path.join(image_dir, entry['source_image_path']), os.path.join(image_dir, entry['image_path']), torch.zeros((image_resize_const, image_resize_const)))
-            
-            # save data
-            item[f'edited_image{image_idx}'][f'my_edit_quality_{LLM_model}'] = modification_score
-            item[f'edited_image{image_idx}'][f'my_preservation_{LLM_model}'] = -consistency_score
-            # item[f'edited_image{image_idx}']['my_dalle2_consistency_score'] = consistency_score
-            # user_data[i]['my_mgie_score'] = modification_score - consistency_score
+                expanded_box = expand_box(source_boxes_filt.numpy(), scale=1.5, image_shape=image.shape)
+            cropped_image = crop_box(image, expanded_box)
+            cropped_source_image = crop_box(source_image, expanded_box)
 
-
-            # except Exception as e:
-            #     print(f"error: {entry['image_path']}")
-            #     print(f"error: {e}")
-            #     continue
-
-            # if process_cnt <= 30:
-            # draw output image
-            # plt.figure(figsize=(10, 10))
-            # plt.imshow(cv2.imread(os.path.join(image_dir, entry['source_image_path'])))
-            # # for mask in masks:
-            # #     show_mask(mask.cpu().numpy(), plt.gca(), random_color=True)
-            # for box, label in zip(boxes_filt, pred_phrases):
-            #     show_box(box.numpy(), plt.gca(), label)
-
-            # plt.axis('off')
-            # save_path = os.path.join(output_dir.replace('outputs', 'vis_result'), entry['image_path'])
+            # # save cropped image
+            # cropped_image_pil = Image.fromarray(cropped_image)
+            # save_path = os.path.join(output_dir, 'cropped_image', entry['image_path'])
             # os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            # plt.savefig(save_path, bbox_inches="tight", dpi=300, pad_inches=0.0)
-            # plt.close()
+            # cropped_image_pil.save(save_path)
+
+            # modification score: directional clip similarity
+            modification_score = clip_score(cropped_source_image, 
+                                            cropped_image, 
+                                            entry['original_image_edited_area'], 
+                                            entry['edited_image_edited_area'],
+                                            clip_processor=clip_processor,
+                                            clip_model=clip_model,
+                                            device=device
+                                            )
+            item[f'edited_image{image_idx}'][f'edit_quality'] = modification_score
+                
+            # consistency score: l2
+            # detect masks
+            for j in range(2):
+                if j % 2 == 0:
+                    # original image
+                    if "none" in entry['original_image_edited_area']:
+                        continue
+                    predictor.set_image(source_image)
+                else:
+                    # edited image
+                    if "none" in entry['edited_image_edited_area']:
+                        continue
+                    predictor.set_image(image)
+
+                # detect masks
+                if "none" in entry['original_image_edited_area']:
+                    transformed_boxes = predictor.transform.apply_boxes_torch(edited_boxes_filt, image.shape[:2]).to(device)
+                else:
+                    transformed_boxes = predictor.transform.apply_boxes_torch(source_boxes_filt, image.shape[:2]).to(device)
+
+                masks, _, _ = predictor.predict_torch(
+                    point_coords = None,
+                    point_labels = None,
+                    boxes = transformed_boxes.to(device),
+                    multimask_output = False,
+                )
+                masks_list.extend(masks)
+
+            # merge masks
+            if len(masks_list) == 0:
+                mask_img = torch.zeros((image_resize_const, image_resize_const))
+            else:
+                mask_img = torch.zeros(masks_list[0].shape[-2:])
+                for mask in masks_list:
+                    mask_img[mask.cpu().numpy()[0] == True] = 1
+
+            # save mask
+            # save_path = os.path.join(output_dir, 'mask', entry['image_path'])
+            # # print(save_path)
+            # os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            # cv2.imwrite(save_path, mask_img.numpy()*255)
+
+            consistency_score = calculate_l2_distance(os.path.join(image_dir, entry['source_image_path']), 
+                                                        os.path.join(image_dir, entry['image_path']), 
+                                                        mask_img)
+            item[f'edited_image{image_idx}'][f'preservation'] = -consistency_score
             
             process_cnt += 1
 
         # save_mask_data(output_dir, masks, boxes_filt, pred_phrases)
-    # print(f"zero bbox: {cnt}")
-    # print(f"process_cnt: {process_cnt}")
+    print(f"zero bbox: {cnt}")
+    print(f"process_cnt: {process_cnt}")
     with open(idx_file, 'w') as f:
         json.dump(user_data, f, indent=4)
