@@ -34,7 +34,7 @@ HF_ENDPOINT=https://hf-mirror.com python bpm.py \
   --device "cuda"
 ```
 
-## Evaluation Results
+## Evaluation
 ```shell
 python eval.py
 ```
