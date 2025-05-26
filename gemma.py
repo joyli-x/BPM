@@ -88,7 +88,7 @@ if __name__ == "__main__":
         device="cuda",
     )
 
-    json_file = './data/sample_test/style_meta.json'
+    json_file = './data/local_metadata.json'
     with open(json_file, 'r') as f:
         metadata = json.load(f)
     

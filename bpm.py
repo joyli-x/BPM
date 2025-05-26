@@ -210,7 +210,7 @@ if __name__ == "__main__":
     print('CLIP model loaded')
     
     # load idx
-    idx_file = './data/sample_test/metadata.json'
+    idx_file = './data/local_metadata.json'
     with open(idx_file, 'r') as f:
         user_data = json.load(f)
     

@@ -130,7 +130,10 @@ dmypy.json
 
 # checkpoint
 *.pth
+
+
 outputs/
 vis_result/
+data/
 
 .idea/
