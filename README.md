@@ -9,7 +9,7 @@ pip install -r requirements.txt
 Then please follow [Grounded_Segment_Anything](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main?tab=readme-ov-file#running_man-grounded-sam-detect-and-segment-everything-with-text-prompt) to download pretrained weights
 
 ## Download metrics evaluation dataset
-Please download the dataset from [Google Drive]([https://dr](https://drive.google.com/drive/folders/12Z4vX8pAGMbq7TtSTuGRCnHmvfb359XL?usp=drive_link)), the `data` should be as follows:
+Please download the dataset from [Google Drive](https://drive.google.com/drive/folders/12Z4vX8pAGMbq7TtSTuGRCnHmvfb359XL?usp=drive_link), the `data` should be as follows:
 ```
 data
 ├── sample_test (images)
