@@ -12,9 +12,11 @@ Then please follow [Grounded_Segment_Anything](https://github.com/IDEA-Research/
 Please download the dataset from [Google Drive](https://drive.google.com/drive/folders/12Z4vX8pAGMbq7TtSTuGRCnHmvfb359XL?usp=drive_link), the `data` should be as follows:
 ```
 data
-├── sample_test (images)
+├── sample_test (human align test images)
+├── gt_test_images (ground truth test images)
 ├── local_metadata.json
 ├── global_metadata.json
+├── gt_test_metadata.json
 ```
 
 ## Run BPM
@@ -36,11 +38,15 @@ HF_ENDPOINT=https://hf-mirror.com python bpm.py \
 
 ## Evaluation
 ```shell
-python eval.py
+# human alignment test (tab.1 and tab.2 in the paper)
+python eval_human_alignment.py
+
+# gt test (tab.4 in the paper)
+python eval_gt_test.py
 ```
 
 ## TODO
-- [ ] Add demo code and visualization code
+- [ ] Add demo
 - [ ] Collect a more diverse global editing dataset
 - [ ] Add supports for "directional object moving"
 

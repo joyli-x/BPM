@@ -220,7 +220,10 @@ if __name__ == "__main__":
     process_cnt = 0
     cnt = 0
 
-    idx2model = {'1': 'pie', '2': 'hq_edit', '3': 'ft_ip2p', '4': 'ip2p'}
+    if 'gt_test' in idx_file:
+        idx2model = {'1': 'sd_xl', '2': 'noise_jitter', '3': 'dalle2'}
+    else:
+        idx2model = {'1': 'pie', '2': 'hq_edit', '3': 'ft_ip2p', '4': 'ip2p'}
     LLM_model = 'gemma'
 
     for item in tqdm(user_data):
