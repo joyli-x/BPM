@@ -1,5 +1,5 @@
 # Balancing Preservation and Modification: A Region and Semantic-Aware Metric for Instruction-Based Image Editing
-This is the official implementation of the paper: "Balancing Preservation and Modification: A Region and Semantic-Aware Metric for Instruction-Based Image Editing" (Accepted to ICML 2025)
+This is the official implementation of the paper: "[Balancing Preservation and Modification: A Region and Semantic-Aware Metric for Instruction-Based Image Editing](https://arxiv.org/abs/2506.13827)" (Accepted to ICML 2025)
 
 ## Installation
 ```
@@ -56,5 +56,9 @@ This code is built upon [Grounded-Segment-Anything](https://github.com/IDEA-Rese
 ## Citation
 If you find this work useful, please consider citing:
 ```bibtex
-TODO (upload to arxiv)
+@inproceedings{libalancing,
+  title={Balancing Preservation and Modification: A Region and Semantic Aware Metric for Instruction-Based Image Editing},
+  author={Li, Zhuoying and Xu, Zhu and Peng, Yuxin and Liu, Yang},
+  booktitle={Forty-second International Conference on Machine Learning}
+}
 ```
