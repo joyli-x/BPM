@@ -45,11 +45,6 @@ python eval_human_alignment.py
 python eval_gt_test.py
 ```
 
-## TODO
-- [ ] Add demo
-- [ ] Collect a more diverse global editing dataset
-- [ ] Add supports for "directional object moving"
-
 ## Acknowledgements
 This code is built upon [Grounded-Segment-Anything](https://github.com/IDEA-Research/Grounded-Segment-Anything) and [Gemma](https://huggingface.co/princeton-nlp/gemma-2-9b-it-SimPO). Thanks for their great work.
 
